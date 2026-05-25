@@ -1,0 +1,60 @@
+name: publish
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read upstream pins
+        id: pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          lsio_sha=$(python3 - <<'PY'
+import json
+print(json.load(open('upstream-lock.json'))['linuxserver/docker-firefox'])
+PY
+)
+          camofox_sha=$(python3 - <<'PY'
+import json
+print(json.load(open('upstream-lock.json'))['jo-inc/camofox-browser'])
+PY
+)
+          echo "lsio_sha=$lsio_sha" >> "$GITHUB_OUTPUT"
+          echo "camofox_sha=$camofox_sha" >> "$GITHUB_OUTPUT"
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags:
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            CAMOFOX_REF=${{ steps.pins.outputs.camofox_sha }}
+            LSIO_FIREFOX_REF=${{ steps.pins.outputs.lsio_sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

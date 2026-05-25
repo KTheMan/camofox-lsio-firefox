@@ -16,25 +16,29 @@ jobs:
       - name: Detect upstream SHAs
         id: shas
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           lsio_sha=$(gh api repos/linuxserver/docker-firefox/commits/master --jq .sha)
           camofox_sha=$(gh api repos/jo-inc/camofox-browser/commits/master --jq .sha)
           echo "lsio_sha=$lsio_sha" >> "$GITHUB_OUTPUT"
           echo "camofox_sha=$camofox_sha" >> "$GITHUB_OUTPUT"
-      - name: Update lock file if changed
+      - name: Update lock file
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json, os
+          path = 'upstream-lock.json'
           data = {
-              "linuxserver/docker-firefox": os.environ["LSIO_SHA"],
-              "jo-inc/camofox-browser": os.environ["CAMOFOX_SHA"],
+              'linuxserver/docker-firefox': os.environ['LSIO_SHA'],
+              'jo-inc/camofox-browser': os.environ['CAMOFOX_SHA'],
           }
-          with open('upstream-lock.json', 'w', encoding='utf-8') as f:
+          with open(path, 'w', encoding='utf-8') as f:
               json.dump(data, f, indent=2)
-              f.write('\n')
+              f.write('
+')
           PY
         env:
           LSIO_SHA: ${{ steps.shas.outputs.lsio_sha }}
@@ -42,10 +46,10 @@ jobs:
       - name: Create pull request
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: 'ci: sync upstream lock files'
-          title: 'ci: sync upstream lock files'
+          commit-message: 'ci: sync upstream pins'
+          title: 'ci: sync upstream pins'
           body: |
-            Automated sync for:
+            Automated sync of the pinned upstream SHAs for:
             - linuxserver/docker-firefox
             - jo-inc/camofox-browser
           branch: ci/sync-upstreams
