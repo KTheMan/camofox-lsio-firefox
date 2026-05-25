@@ -22,9 +22,25 @@ jobs:
           set -euo pipefail
           lsio_sha=$(gh api repos/linuxserver/docker-firefox/commits/master --jq .sha)
           camofox_sha=$(gh api repos/jo-inc/camofox-browser/commits/master --jq .sha)
+          current_lsio=$(python3 - <<'PY'
+import json
+print(json.load(open('upstream-lock.json'))['linuxserver/docker-firefox'])
+PY
+)
+          current_camofox=$(python3 - <<'PY'
+import json
+print(json.load(open('upstream-lock.json'))['jo-inc/camofox-browser'])
+PY
+)
+          if [ "$lsio_sha" = "$current_lsio" ] && [ "$camofox_sha" = "$current_camofox" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "lsio_sha=$lsio_sha" >> "$GITHUB_OUTPUT"
           echo "camofox_sha=$camofox_sha" >> "$GITHUB_OUTPUT"
       - name: Update lock file
+        if: steps.shas.outputs.changed == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -44,6 +60,7 @@ jobs:
           LSIO_SHA: ${{ steps.shas.outputs.lsio_sha }}
           CAMOFOX_SHA: ${{ steps.shas.outputs.camofox_sha }}
       - name: Create pull request
+        if: steps.shas.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           commit-message: 'ci: sync upstream pins'

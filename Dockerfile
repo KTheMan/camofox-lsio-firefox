@@ -7,7 +7,7 @@ WORKDIR /src
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates   && rm -rf /var/lib/apt/lists/*
 RUN git clone --depth 1 --branch "${CAMOFOX_REF}" "${CAMOFOX_REPO}" /src/camofox-browser
 WORKDIR /src/camofox-browser
-RUN npm ci --omit=dev && npm run build
+RUN npm ci && npm run build
 
 FROM ghcr.io/linuxserver/baseimage-selkies:ubunturesolute
 
