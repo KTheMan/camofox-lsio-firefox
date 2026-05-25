@@ -1,0 +1,52 @@
+name: sync-upstreams
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect upstream SHAs
+        id: shas
+        shell: bash
+        run: |
+          set -euo pipefail
+          lsio_sha=$(gh api repos/linuxserver/docker-firefox/commits/master --jq .sha)
+          camofox_sha=$(gh api repos/jo-inc/camofox-browser/commits/master --jq .sha)
+          echo "lsio_sha=$lsio_sha" >> "$GITHUB_OUTPUT"
+          echo "camofox_sha=$camofox_sha" >> "$GITHUB_OUTPUT"
+      - name: Update lock file if changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          data = {
+              "linuxserver/docker-firefox": os.environ["LSIO_SHA"],
+              "jo-inc/camofox-browser": os.environ["CAMOFOX_SHA"],
+          }
+          with open('upstream-lock.json', 'w', encoding='utf-8') as f:
+              json.dump(data, f, indent=2)
+              f.write('\n')
+          PY
+        env:
+          LSIO_SHA: ${{ steps.shas.outputs.lsio_sha }}
+          CAMOFOX_SHA: ${{ steps.shas.outputs.camofox_sha }}
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: 'ci: sync upstream lock files'
+          title: 'ci: sync upstream lock files'
+          body: |
+            Automated sync for:
+            - linuxserver/docker-firefox
+            - jo-inc/camofox-browser
+          branch: ci/sync-upstreams
+          delete-branch: true
