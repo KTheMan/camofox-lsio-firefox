@@ -9,9 +9,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Build Docker image
-        run: docker build -t camofox-lsio-firefox:ci .
+        run: bash scripts/build-image.sh -t camofox-lsio-firefox:ci
+      - name: Verify browser automation and the Selkies stream
+        run: bash scripts/smoke-image.sh camofox-lsio-firefox:ci

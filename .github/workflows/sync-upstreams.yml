@@ -8,66 +8,47 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
+      actions: write
       contents: write
       pull-requests: write
+    env:
+      USING_REPO_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN == '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - upstream: selkies
+            pin: pins/selkies-image
+          - upstream: camofox
+            pin: pins/camofox-ref
+    concurrency:
+      group: sync-upstream-${{ matrix.upstream }}
     steps:
       - uses: actions/checkout@v4
-      - name: Detect upstream SHAs
-        id: shas
-        shell: bash
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - name: Resolve one upstream
+        env:
+          UPSTREAM: ${{ matrix.upstream }}
+        run: bash scripts/update-upstream.sh "$UPSTREAM"
+      - name: Open or update upstream PR
+        id: pr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.UPSTREAM_SYNC_TOKEN || github.token }}
+          add-paths: ${{ matrix.pin }}
+          commit-message: 'build: update ${{ matrix.upstream }} pin'
+          title: 'build: update ${{ matrix.upstream }} pin'
+          body: |
+            Refreshes `${{ matrix.pin }}` from the published upstream.
+            The candidate runs the overlay build and headed browser smoke check before publishing.
+          branch: automation/update-${{ matrix.upstream }}
+          delete-branch: true
+      - name: Start CI on the candidate
+        if: env.USING_REPO_TOKEN == 'true' && (steps.pr.outputs.pull-request-operation == 'created' || steps.pr.outputs.pull-request-operation == 'updated')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          lsio_sha=$(gh api repos/linuxserver/docker-firefox/commits/master --jq .sha)
-          camofox_sha=$(gh api repos/jo-inc/camofox-browser/commits/master --jq .sha)
-          current_lsio=$(python3 - <<'PY'
-import json
-print(json.load(open('upstream-lock.json'))['linuxserver/docker-firefox'])
-PY
-)
-          current_camofox=$(python3 - <<'PY'
-import json
-print(json.load(open('upstream-lock.json'))['jo-inc/camofox-browser'])
-PY
-)
-          if [ "$lsio_sha" = "$current_lsio" ] && [ "$camofox_sha" = "$current_camofox" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-          echo "lsio_sha=$lsio_sha" >> "$GITHUB_OUTPUT"
-          echo "camofox_sha=$camofox_sha" >> "$GITHUB_OUTPUT"
-      - name: Update lock file
-        if: steps.shas.outputs.changed == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json, os
-          path = 'upstream-lock.json'
-          data = {
-              'linuxserver/docker-firefox': os.environ['LSIO_SHA'],
-              'jo-inc/camofox-browser': os.environ['CAMOFOX_SHA'],
-          }
-          with open(path, 'w', encoding='utf-8') as f:
-              json.dump(data, f, indent=2)
-              f.write('
-')
-          PY
-        env:
-          LSIO_SHA: ${{ steps.shas.outputs.lsio_sha }}
-          CAMOFOX_SHA: ${{ steps.shas.outputs.camofox_sha }}
-      - name: Create pull request
-        if: steps.shas.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          commit-message: 'ci: sync upstream pins'
-          title: 'ci: sync upstream pins'
-          body: |
-            Automated sync of the pinned upstream SHAs for:
-            - linuxserver/docker-firefox
-            - jo-inc/camofox-browser
-          branch: ci/sync-upstreams
-          delete-branch: true
+          UPSTREAM_BRANCH: automation/update-${{ matrix.upstream }}
+        run: gh workflow run ci.yml --ref "$UPSTREAM_BRANCH"
