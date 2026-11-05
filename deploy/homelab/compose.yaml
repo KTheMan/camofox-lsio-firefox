@@ -1,0 +1,55 @@
+name: camofox-lsio-firefox
+services:
+  camofox:
+    image: camofox-lsio-firefox:browser-first
+    container_name: ${CAMOFOX_CONTAINER_NAME:-camofox-lsio-firefox}
+    restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      TITLE: Camofox Shared Browser
+      SELKIES_UI_TITLE: Camofox Shared Browser
+      SELKIES_DESKTOP: "true"
+      # The headed browser needs the same X11 display that Selkies captures.
+      PIXELFLUX_WAYLAND: "false"
+      SELKIES_VIEWPORT_WIDTH: "2560"
+      SELKIES_VIEWPORT_HEIGHT: "1306"
+      BROWSER_VIEWPORT_WIDTH: "2560"
+      BROWSER_VIEWPORT_HEIGHT: "1306"
+      CAMOFOX_PORT: "9377"
+      SELKIES_ENABLE_SHARING: "false|locked"
+      SELKIES_UI_SIDEBAR_SHOW_SHARING: "false"
+      SELKIES_COMMAND_ENABLED: "false|locked"
+      SELKIES_FILE_TRANSFERS: none
+      SELKIES_UI_SIDEBAR_SHOW_FILES: "false"
+      SELKIES_UI_SIDEBAR_SHOW_APPS: "false"
+      SELKIES_MICROPHONE_ENABLED: "false|locked"
+      SELKIES_GAMEPAD_ENABLED: "false|locked"
+      SELKIES_UI_SIDEBAR_SHOW_GAMEPADS: "false"
+    ports:
+      - "127.0.0.1:${CAMOFOX_API_PORT:-9394}:9377"
+      - "127.0.0.1:${CAMOFOX_DESKTOP_PORT:-9396}:3000"
+    volumes:
+      - camofox_config:/config
+      - ./desktop/nginx.conf:/defaults/default.conf:ro
+      - ./desktop/startwm.sh:/defaults/startwm.sh:ro
+      - ./desktop:/opt/camofox-desktop:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -S /tmp/.X11-unix/X1 && pgrep -x openbox >/dev/null &&
+          curl -fsS --max-time 2 http://127.0.0.1:9377/health >/dev/null &&
+          curl -fsS --max-time 2 http://127.0.0.1:3000/ >/dev/null
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    networks:
+      - browser
+volumes:
+  camofox_config:
+networks:
+  browser:
+    name: ${CAMOFOX_NETWORK:-camofox_browser_private}
+    external: true

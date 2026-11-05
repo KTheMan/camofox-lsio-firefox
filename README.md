@@ -11,37 +11,53 @@ This repository builds a replacement for the LSIO Firefox container that keeps t
 
 ## Upstreams
 
-- LSIO Firefox: https://github.com/linuxserver/docker-firefox
+- LSIO Selkies desktop base: https://github.com/linuxserver/docker-baseimage-selkies
 - Camofox browser server: https://github.com/jo-inc/camofox-browser
 
 ## How it works
 
-- The image starts from `ghcr.io/linuxserver/baseimage-selkies`
-- Camofox is built from the upstream repo during the image build
-- The resulting container launches `node server.js` inside the Selkies desktop environment
+- The image uses the exact LSIO manifest in `pins/selkies-image` and the exact Camofox commit in `pins/camofox-ref`.
+- Camofox runs as the desktop user on the Selkies X11 display using upstream's `CAMOFOX_INTERACTIVE=desktop` setting.
+- API clients can create tabs even when nobody is connected to the Selkies desktop.
 - `/config` remains the persistent state volume
 
 ## Default ports
 
-- `9377` — Camofox API/browser server
+- `3000` — Selkies desktop HTTP origin for a local connection or authenticated TLS proxy
+- `9377` — Camofox API/browser server for local automation
 
 ## Build and run
 
 ```bash
-docker build -t camofox-lsio-firefox .
-docker run --rm -p 9377:9377 -v /path/to/config:/config camofox-lsio-firefox
+bash scripts/build-image.sh -t camofox-lsio-firefox:candidate
+bash scripts/smoke-image.sh camofox-lsio-firefox:candidate
 ```
+
+The CI check uses the [Selkies desktop integration files](deploy/homelab/desktop).
 
 ## Upstream sync policy
 
-The repository keeps an `upstream-lock.json` file with the latest pinned SHAs from:
+The daily sync resolves the LSIO `ubunturesolute` image digest and the newest
+stable Camofox `vX.Y.Z` tag separately. It opens one PR per changed pin. Each PR
+touches only its own file, so the two updates can merge independently.
 
-- `linuxserver/docker-firefox`
-- `jo-inc/camofox-browser`
+CI builds the pinned pair, opens and snapshots a headed browser tab with no
+viewer, checks that its window is on the Selkies X11 display, and verifies the
+WebSocket upgrade against the deployment's nginx config. The publish workflow
+repeats those checks before pushing an image to GHCR. Deploy an immutable image
+tag to staging before changing the live stack. Publishing alone does not deploy.
 
-A scheduled GitHub Actions workflow checks both repos, updates the lock file when they change, and opens a PR with the new pins.
+Enable **Allow GitHub Actions to create and approve pull requests** in the
+repository's Actions settings for the default workflow token. The sync dispatches
+CI on each updated branch explicitly with this token. The separate PR event may
+still display GitHub's approval prompt for bot-created pull requests. If the
+setting stays disabled, supply a repository-scoped fine-grained PAT with
+contents and pull requests write access as `UPSTREAM_SYNC_TOKEN`. With that
+token, GitHub starts CI through the normal PR event.
 
-A second workflow builds the container and publishes images to GHCR on push.
+The initial LSIO pin matches the deployed browser-first base. The nginx overlay
+supports the original `/websockets` route and the newer `/api/websockets` route.
+CI reads the bundled dashboard to select the route to verify.
 
 ## Notes
 

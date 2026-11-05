@@ -2,59 +2,53 @@ name: publish
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     tags:
       - 'v*'
   workflow_dispatch:
 
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-      - name: Read upstream pins
-        id: pins
-        shell: bash
+      - name: Build Docker image
         run: |
-          set -euo pipefail
-          lsio_sha=$(python3 - <<'PY'
-import json
-print(json.load(open('upstream-lock.json'))['linuxserver/docker-firefox'])
-PY
-)
-          camofox_sha=$(python3 - <<'PY'
-import json
-print(json.load(open('upstream-lock.json'))['jo-inc/camofox-browser'])
-PY
-)
-          echo "lsio_sha=$lsio_sha" >> "$GITHUB_OUTPUT"
-          echo "camofox_sha=$camofox_sha" >> "$GITHUB_OUTPUT"
+          bash scripts/build-image.sh -t camofox-overlay:verified \
+            --build-arg "VERSION=$GITHUB_SHA" \
+            --build-arg "BUILD_DATE=$(date -u +%FT%TZ)"
+      - name: Verify browser automation and the Selkies stream
+        run: bash scripts/smoke-image.sh camofox-overlay:verified
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Docker metadata
+      - name: Docker tags
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
-          tags:
+          tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
             type=ref,event=tag
-            type=sha
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          build-args: |
-            CAMOFOX_REF=${{ steps.pins.outputs.camofox_sha }}
-            LSIO_FIREFOX_REF=${{ steps.pins.outputs.lsio_sha }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+            type=sha,format=long
+      - name: Publish verified image
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            docker image tag camofox-overlay:verified "$tag"
+            docker image push "$tag"
+          done <<< "$IMAGE_TAGS"
