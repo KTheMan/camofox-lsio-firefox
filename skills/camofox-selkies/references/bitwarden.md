@@ -1,6 +1,55 @@
 # Native Bitwarden route
 
-## Sealed R3 acceptance
+## Current R4 operation
+
+R4 deployed to the main container on 2026-11-09; image `sha256:4ce65b65ed0827589023ed806cdd9db9a059943ce8bb1c0112fce3003041a29e`, source `be42ffad88af21f2ad338ca6231ab9873131d62f004bd0eceddebb7a2addf89e`; rollout post-check passed.
+
+The user's selected policy is default allow with an initially empty administrator
+blacklist. This supersedes R3's human-only sign-in approval. Hermes 1.0.3-passkey
+adds `browser_bitwarden_approve_passkey(operationId, accountHint?)`; the canonical
+MCP tool is `camofox_approve_passkey`. The API accepts only an owned task tab,
+operation identity and optional exact visible username. It accepts no caller URL,
+frame, selector, signing key or policy override.
+
+Unlock through the protected broker before triggering the website's request.
+Successful unlock prearms one native controller for that lease. The signed extension
+handles the passkey cryptography. One unambiguous eligible GET prompt can be
+approved; registration is separate. Verify website login after `approval_sent`,
+then explicitly lock and confirm it. An uncertain click is never retried.
+Verification, failed relock and uncertain approval keep automation protected.
+Human CAPTCHA/login handoff remains independent and needs explicit return of control.
+
+The administrator policy is `STACK/passkey-policy/blacklist.json`, mounted as a
+read-only directory at `/run/camofox-passkeys`. The path setting is
+`CAMOFOX_PASSKEY_POLICY_FILE=/run/camofox-passkeys/blacklist.json`.
+Use root ownership, mode 0644 and atomic replacement. Its exact schema is:
+
+```json
+{"version":1,"blockedOrigins":[],"blockedRpIds":[],"blockedAccounts":[]}
+```
+
+Origins match exact canonical bare HTTPS origins; RP domains also block their
+descendants. Account matching uses the extension's visible username, with case
+and whitespace normalization, rather than the item title or cryptographic
+userHandle. Account blocks with unavailable visible identity fail closed.
+Malformed/missing/insecure policy fails closed; the model cannot edit it.
+
+Signed 2026.7.0 has a popup route-cache bug: a passkey popout can inherit the toolbar's
+`/tabs/current` hash while the original FIDO UI remains mounted. Do not accept that
+route without provenance, reload the pending prompt, or loosen sender/session checks.
+The prearmed native observer records the initial strict FIDO URL and exact native
+popup document identity before the rewrite. Only the demonstrated queryless
+`/tabs/current` rewrite is supported, with unchanged outer session marker and exact
+current document, sender tab/frame and task page. The final click targets that exact
+document actor. Capture failure, navigation, other route/session changes, expiry,
+observer errors and overflow refuse approval. Native records self-expire with the
+lease; no private key or SDK state is read.
+
+Rebuild this custom release from its archived `release/Dockerfile` and source/host
+packages with the release manifest. The repository's ordinary LSIO baseline build
+does not recreate it. Runtime 2FA and Google sign-in still need their own evidence.
+
+## Historical sealed R3 acceptance
 
 On November 9, 2026, the isolated sealed R3 candidate passed 34 general acceptance
 checks and 19 short-idle lease checks. The idle run waited 65 seconds with no API
@@ -19,14 +68,14 @@ source uses `release/Dockerfile` over immutable base image
 `sha256:202ef6061a786c5afdc7413a70716d5a4266389169b23a1e328d62293d21f029`.
 Keep the custom source and host packages with the release manifest when rebuilding.
 
-Human approval in the real Bitwarden passkey prompt remains the default. There is
-no autonomous passkey-approval API. Runtime 2FA completion was not exercised, and
+R3 required human approval in the real Bitwarden prompt and had no autonomous
+approval API. R4 above supersedes that approval policy. Runtime 2FA completion was not exercised, and
 Google login was not tested. PIN/biometric configurations that suppress the
 extension reload are rejected fail-closed. Never reload a pending passkey prompt;
 its ConnectResponse handshake is accepted once. If reload or relock is uncertain,
 keep automation blocked.
 
-**Native broker production deployment:** deployed on 2026-11-09. The main container uses the accepted image above,
+**Historical R3 production deployment:** deployed on 2026-11-09. It used the accepted image above,
 retains its existing profile volume, and passed authenticated API, desktop HTTP/
 WebSocket upgrade, native login-start status, owner authorization and Hermes
 activation checks without starting a real credential service. The base-only URL correction below is a separate,
@@ -116,3 +165,30 @@ unknown/unavailable. One delayed status-only retry is reasonable; then preserve
 state and investigate the typed error. Never retry an uncertain credential submit,
 reinstall the addon or loop container restarts. If status is already unlocked, do
 not invoke the credential service again merely to establish readiness.
+
+Automatic approval requires the current caller's active unlocked broker operation.
+A manually unlocked extension alone does not grant that lease. If the operation
+identity is unavailable, preserve the UI for human completion or explicitly lock
+and start a fresh authorized consuming workflow. Do not dispatch credentials
+merely because status is already unlocked.
+
+Equivalent FIDO URL encodings pass only when every decoded field and its presence match exactly, with valid UTF-8 and no duplicate or unknown fields.
+
+For native startup maintenance, use the readiness event's `currentTarget` and
+primitive `outerWindowId` with the window mediator. A JavaScript WeakRef to a
+transient Chrome-window wrapper can disappear while the native window is still
+alive, causing missed capture and incomplete listener cleanup. Keep this tested
+against the pinned engine when changing its version.
+
+After a completed popout closes, reset global native metadata/status checks to a
+live normal Chrome window without focusing it. Keep the same prearmed Marionette
+session. A closed selected popup must not kill the lease's controller or trigger
+browser/extension restarts; stale closing handles are skipped during inventory.
+
+A later sealed-fixture unlock timed out and entered protected `lock_failed`; a
+credential-free explicit lock recovered it, and a fresh consuming workflow then
+completed in 10.08 seconds. Do not retry an uncertain credential submission.
+Inspect the operation's typed cause and obtain verified lock before a fresh
+workflow. The regular unlock (60s) plus controller arming (up to 25s) can exceed
+the local socket's 65s budget; this end-to-end budget remains a reliability gap,
+not proof of the observed timeout's cause. Keep failed/uncertain states blocked.
