@@ -16,7 +16,9 @@ or smoke-test both rather than assuming a path. The browser and desktop must sha
 the same X11 display (`PIXELFLUX_WAYLAND=false`, `CAMOFOX_INTERACTIVE=desktop`).
 
 For build changes run `scripts/build-image.sh` and `scripts/smoke-image.sh` against
-an isolated candidate. Runtime tests require a uniquely named container/network,
+an isolated candidate. These validate the ordinary LSIO baseline. Rebuilding native
+R3 requires the archived `release/Dockerfile` and the separately versioned host
+packages described in the extension reference. Runtime tests require a uniquely named container/network,
 a fresh profile, bounded resources, and no live profile or credential mounts. Do
 not attach one profile to two running Firefox processes. Use disposable credentials
 and controlled HTTPS fixtures for extension/passkey testing.
@@ -25,6 +27,9 @@ For native Bitwarden control, read [the extension reference](references/bitwarde
 Keep credentials out of model tools, HTTP payloads, screenshots, diagnostics, and
 command arguments. The normal extension UI performs vault unlock and passkey
 cryptography; the driver does not export private keys or call internal SDK methods.
+The native route has isolated sealed R3 acceptance; it remains pending production
+promotion until the deployment status in the reference is updated. Human approval
+in the actual passkey prompt remains required.
 
 Promote each completed, tested and reviewed aspect when the current user request
 authorizes rollout. Preserve rollback image/configuration, stage with a fresh
