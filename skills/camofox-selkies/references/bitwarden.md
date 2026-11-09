@@ -47,7 +47,30 @@ lease; no private key or SDK state is read.
 
 Rebuild this custom release from its archived `release/Dockerfile` and source/host
 packages with the release manifest. The repository's ordinary LSIO baseline build
-does not recreate it. Runtime 2FA and Google sign-in still need their own evidence.
+does not recreate it. Runtime 2FA and Google sign-in require separate evidence.
+
+## Live Google and Gemini verification (2026-11-09)
+
+In an owner-authorized consuming login, the protected native unlock and passkey
+approval completed Google sign-in for the intended account. Gemini's account
+label and origin were verified. Bitwarden was explicitly locked and a later
+status check confirmed `locked`. No master password or passkey was returned to
+the model. Google presented no separate phone/OTP/MFA challenge; live 2FA remains
+unverified.
+
+Two fill-mode Gemini submissions stalled. A subsequent focused composer input
+using the existing type API's `mode:"keyboard", delay:70` produced the expected
+assistant reply in Flash, with response Copy available, Stop absent and the
+composer usable. This is a verified working route, not proof that every fill
+submission fails. The Hermes adapter update exposes the optional keyboard mode;
+use its installed schema and the maintained Gemini skill.
+
+Hermes had been using random browser identities. Configuring only the already
+owned profile's `browser.camofox.user_id`, while keeping session keys per task,
+allowed a distinct task to verify the same signed-in account without another
+credential action. No cookies were exported, no gateway restart was required,
+and the proof tab was closed. Browser restart durability was not tested. Keep
+unrelated active Hermes work running when preparing an adapter update.
 
 ## Historical sealed R3 acceptance
 
