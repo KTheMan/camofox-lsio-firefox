@@ -64,3 +64,8 @@ CI reads the bundled dashboard to select the route to verify.
 - Do **not** mount the same Firefox profile into two live browser processes at once.
 - If you want to share cookies, mount the whole profile directory, not just `cookies.sqlite`.
 - This repo is intentionally public so upstream sync changes are visible.
+
+## Agent operations skill
+
+The repository includes the [Camofox/Selkies skill](skills/camofox-selkies/SKILL.md) for build, isolated testing, deployment, native Bitwarden control, and human handoff. Its extension reference records verified behavior and remaining acceptance limits.
+
