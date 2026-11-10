@@ -1,8 +1,13 @@
 # Native Bitwarden route
 
-## Current R4 operation
+## R4 baseline and last-observed deployment
 
 R4 deployed to the main container on 2026-11-09; image `sha256:4ce65b65ed0827589023ed806cdd9db9a059943ce8bb1c0112fce3003041a29e`, source `be42ffad88af21f2ad338ca6231ab9873131d62f004bd0eceddebb7a2addf89e`; rollout post-check passed.
+
+An accepted R5 timeout-recovery candidate is described below. At the last observed
+queue snapshot, its promotion was `waiting_for_idle` and the main image was R4.
+The background waiter can activate after that snapshot. Inspect the actual running
+immutable image and rollout receipt before assuming either version's behavior.
 
 The user's selected policy is default allow with an initially empty administrator
 blacklist. This supersedes R3's human-only sign-in approval. Hermes 1.0.3-passkey
@@ -58,12 +63,27 @@ status check confirmed `locked`. No master password or passkey was returned to
 the model. Google presented no separate phone/OTP/MFA challenge; live 2FA remains
 unverified.
 
-Two fill-mode Gemini submissions stalled. A subsequent focused composer input
-using the existing type API's `mode:"keyboard", delay:70` produced the expected
-assistant reply in Flash, with response Copy available, Stop absent and the
-composer usable. This is a verified working route, not proof that every fill
-submission fails. The Hermes adapter update exposes the optional keyboard mode;
-use its installed schema and the maintained Gemini skill.
+Two fill-mode Gemini submissions stalled. Focused keyboard input produced two
+completed Flash replies: the first through the existing type API with a historical
+70 ms character delay, and the second through the actual Hermes 1.0.4 handler with
+its default 0 ms delay. The intended account and origin matched; the expected marker
+was inside the assistant response, Copy was available, Stop absent and the composer
+usable. The second reply was verified after reopening its exact stored thread in
+the same owned stable profile, without another unlock or sign-in. This is a
+verified working route, not proof that every fill submission fails.
+
+For ordinary Gemini prompts, focus the latest composer and use
+`browser_type(ref, text, mode="keyboard", delay=0)`. A fixed long per-character delay
+can exhaust the default 30-second client request budget on a normal prompt. Keep
+the maintained Gemini skill's between-action pacing. Use `textContent` for routine
+response reads rather than `innerText` or forced-layout probes; this does not prove
+the cause of earlier rendering or evaluation stalls. Credentials continue to use
+the protected native route.
+
+Hermes 1.0.4-keyboard is installed. The late post-check matched installed files,
+registered 22 tools and confirmed gateway RPC readiness, with no additional service
+actions. Its initial `recovery_deferred_unknown_work` receipt remains retained;
+the later successful post-check resolves that uncertainty.
 
 Hermes had been using random browser identities. Configuring only the already
 owned profile's `browser.camofox.user_id`, while keeping session keys per task,
@@ -71,6 +91,39 @@ allowed a distinct task to verify the same signed-in account without another
 credential action. No cookies were exported, no gateway restart was required,
 and the proof tab was closed. Browser restart durability was not tested. Keep
 unrelated active Hermes work running when preparing an adapter update.
+
+## Accepted R5 timeout recovery and queued promotion snapshot
+
+R4 has a P1 control gap: a read-only `/evaluate` timeout destroyed the live Gemini
+tab with reason `operation_timeout`. Empty-session reaper cleanup happened later;
+the tab inactivity setting was 30 minutes and the browser had not restarted.
+The site's request outcome was unknown at the read failure. Reopening the exact
+stored thread later proved the reply had already completed, so an automatic repeat
+would have duplicated an action. No cause of the underlying evaluation stall has
+been established.
+
+The final R5 candidate image is
+`sha256:b3466ab2c04b7aa7127dbe8eb22e57e79d0743c3d10564a1fe5412cc41bc4d55`.
+It passed 15 isolated runtime checks using a wholly separate container, fresh
+profile and controlled fixture, with no real sites or credentials. On evaluation
+timeout, R5 retains the original tab and unsent draft, pauses automation and returns
+HTTP 409 `recovery_handoff_required`. The outcome remains unknown; late completion
+does not resume automation or replace the lease. A wrong lease or missing human
+confirmation is rejected; explicit confirmation of the correct recovery lease
+restores control, after which normal input was verified.
+
+Independent review approved the final candidate and promoter; 16 promoter checks
+passed on Linux, including POSIX behavior. Promotion is queued with a bounded
+two-hour wait for safe host load and idle Hermes/browser work. At the last observed
+snapshot, the queue receipt was `waiting_for_idle`; no production image pin or
+browser change had occurred, and no credential service was started by queueing.
+Activation is not guaranteed.
+
+This is accepted candidate evidence, not a production rollout receipt. The
+background waiter may promote R5 after the recorded snapshot. Inspect the actual
+main container image and promotion receipt/post-checks before applying R4 or R5
+behavior. Do not automatically replay timed-out evaluation code or an uncertain
+website action, and preserve human handoff ownership.
 
 ## Historical sealed R3 acceptance
 
