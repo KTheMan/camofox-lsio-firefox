@@ -1,13 +1,14 @@
 # Native Bitwarden route
 
-## R4 baseline and last-observed deployment
+## R4 baseline and R5 activation evidence
 
 R4 deployed to the main container on 2026-11-09; image `sha256:4ce65b65ed0827589023ed806cdd9db9a059943ce8bb1c0112fce3003041a29e`, source `be42ffad88af21f2ad338ca6231ab9873131d62f004bd0eceddebb7a2addf89e`; rollout post-check passed.
 
-An accepted R5 timeout-recovery candidate is described below. At the last observed
-queue snapshot, its promotion was `waiting_for_idle` and the main image was R4.
-The background waiter can activate after that snapshot. Inspect the actual running
-immutable image and rollout receipt before assuming either version's behavior.
+R5 is deployed: the final release activated successfully and was verified at
+2026-11-10 04:36:28 UTC. Its immutable image, runtime hashes, labels, Compose and
+broker pin matched the accepted release, with the original profile retained.
+Inspect the actual running image and successful activation receipt for later
+operations; a running unit or `files_swapped` alone is not a rollout receipt.
 
 The user's selected policy is default allow with an initially empty administrator
 blacklist. This supersedes R3's human-only sign-in approval. Hermes 1.0.3-passkey
@@ -92,7 +93,7 @@ credential action. No cookies were exported, no gateway restart was required,
 and the proof tab was closed. Browser restart durability was not tested. Keep
 unrelated active Hermes work running when preparing an adapter update.
 
-## Accepted R5 timeout recovery and queued promotion snapshot
+## Accepted R5 timeout recovery and activation record
 
 R4 has a P1 control gap: a read-only `/evaluate` timeout destroyed the live Gemini
 tab with reason `operation_timeout`. Empty-session reaper cleanup happened later;
@@ -104,6 +105,8 @@ been established.
 
 The final R5 candidate image is
 `sha256:b3466ab2c04b7aa7127dbe8eb22e57e79d0743c3d10564a1fe5412cc41bc4d55`.
+Its accepted server source archive SHA-256 is
+`fa924bb4244493e91f7ca3702a009baebc3efa8651b4348e90d902602f34ebc3`.
 It passed 15 isolated runtime checks using a wholly separate container, fresh
 profile and controlled fixture, with no real sites or credentials. On evaluation
 timeout, R5 retains the original tab and unsent draft, pauses automation and returns
@@ -112,18 +115,56 @@ does not resume automation or replace the lease. A wrong lease or missing human
 confirmation is rejected; explicit confirmation of the correct recovery lease
 restores control, after which normal input was verified.
 
-Independent review approved the final candidate and promoter; 16 promoter checks
-passed on Linux, including POSIX behavior. Promotion is queued with a bounded
-two-hour wait for safe host load and idle Hermes/browser work. At the last observed
-snapshot, the queue receipt was `waiting_for_idle`; no production image pin or
-browser change had occurred, and no credential service was started by queueing.
-Activation is not guaranteed.
+Independent review approved the final release and wrapper; all 32 Linux operator
+checks passed. The final staged module is
+`/tmp/camofox-r5-deploy-release-20261109`; its release unit is
+`camofox-evaluate-r5-release-20261109.service` and its fresh backup/receipt directory
+is `/DATA/GitHub/camofox-r5-rollouts/20261109-evaluate-timeout-r5-release`.
+The reviewed operator helper source SHA-256 is
+`097e1cb5424e0d1e5d472ee32d99bf9b7beb886a1214e918ccb69ba8891dd9cc`.
+The unit completed with exit status 0 and receipt phase `activated`. The running
+container started at 2026-11-10 04:34:22 UTC; metadata verification at 04:36:28 UTC
+confirmed the accepted image, runtime hashes, labels, Compose pin, broker image
+pin and retained profile. Unauthenticated API access returned 401, health returned
+200, and the desktop used `/api/websockets`. Native readiness passed on its first
+metadata-only attempt with HTTP 200 `login_start`; the gateway was RPC-ready with
+zero active agents/work. No credential service or new authentication was used for
+these post-checks. For later operations inspect the actual image and successful
+activation receipt. Do not automatically replay timed-out evaluation code or an
+uncertain website action, and preserve human handoff ownership.
 
-This is accepted candidate evidence, not a production rollout receipt. The
-background waiter may promote R5 after the recorded snapshot. Inspect the actual
-main container image and promotion receipt/post-checks before applying R4 or R5
-behavior. Do not automatically replay timed-out evaluation code or an uncertain
-website action, and preserve human handoff ownership.
+The readiness gate uses current resource pressure, including Linux PSI, rather
+than treating historical global load as current saturation. An earlier read-only
+Docker CLI exec wait hung on its pipes even though the command had completed and
+the API probe took about 0.28 seconds. Distinguish a client wait/pipe failure from
+a running browser failure. The reviewed operator uses bounded, detached Engine API
+completion polling and exact-owned cleanup for metadata probes; it does not depend
+on attached CLI stdout completing. This is not a general model-facing exec surface.
+
+An earlier R5 attempt failed its native post-check and rolled back to R4. Gateway
+RPC startup was initially checked too early; a later read-only check verified the
+retained R4 profile, native HTTP 200 `login_start`, and idle gateway RPC. The final
+wrapper uses a bounded gateway startup wait and at most one metadata-only native
+readiness retry for reviewed transient codes after verified cleanup. Never retry
+`cleanup_failed`, credential submission or an unknown submit outcome.
+
+When a metadata probe needs an owned blank tab, omit `url` from `POST /tabs` so the
+server creates its default blank page. Explicit `about:blank` is rejected by the
+HTTP(S)-only navigation policy. Close only the probe's owned tab after inspection;
+do not navigate or close an existing human or login tab. These readiness checks
+deliver no secret and do not establish a new authenticated session.
+
+During maintenance, the user explicitly authorized a cooperative pause of the VPN
+task's exact generation. Its workspace and history were retained; continuation is
+a scheduled/new worker from the saved checkpoint, not restored RAM. The earlier
+unknown admission remains unresolved; neither scheduling nor checkpoint retention
+proves that the VPN task completed. Preserve generation ownership and confirm the
+new worker's admission instead of starting duplicate continuations.
+
+Browser views later crashed. One controlled same-R4 recovery restart retained the
+original profile/configuration. Unsaved RAM remains unverified; no post-restart
+Google login durability or separate live 2FA proof was obtained. Keep those limits
+separate from R5 fixture acceptance and the verified metadata activation record.
 
 ## Historical sealed R3 acceptance
 
