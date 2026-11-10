@@ -2,3 +2,6 @@
 Dockerfile text eol=lf
 pins/* text eol=lf
 .github/workflows/*.yml text eol=lf
+
+# Patch context lines must retain their leading marker.
+custom-release/*.patch -whitespace

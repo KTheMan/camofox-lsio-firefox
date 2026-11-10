@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "camofox-r2": {
+      "command": "node",
+      "args": ["/absolute/path/to/candidate/mcp/server.mjs"],
+      "env": {
+        "CAMOFOX_BASE_URL": "http://127.0.0.1:19394",
+        "CAMOFOX_API_KEY_FILE": "/absolute/path/to/candidate/release/secrets/client-key",
+        "CAMOFOX_USER_ID": "example-candidate",
+        "CAMOFOX_SESSION_KEY": "review"
+      }
+    }
+  }
+}

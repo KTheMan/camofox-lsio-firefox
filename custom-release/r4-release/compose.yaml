@@ -1,0 +1,71 @@
+name: camofox-native-r3-candidate
+services:
+  browser:
+    image: camofox-bitwarden:2026.11.09-native-r3
+    pull_policy: never
+    container_name: camofox-native-r3-candidate
+    restart: unless-stopped
+    cpus: 1
+    mem_limit: 3g
+    memswap_limit: 3g
+    shm_size: 1g
+    security_opt: [seccomp:unconfined]
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    environment:
+      CAMOFOX_API_KEY_FILE: /run/secrets/camofox-control-key
+      CAMOFOX_ACCESS_GATE: ${CAMOFOX_ACCESS_GATE:-0}
+      CF_ACCESS_ISSUER: ${CF_ACCESS_ISSUER:-}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD:-}
+      CAMOFOX_INTERACTIVE: desktop
+      PIXELFLUX_WAYLAND: "false"
+      SELKIES_DESKTOP: "true"
+      SELKIES_VIEWPORT_WIDTH: "1920"
+      SELKIES_VIEWPORT_HEIGHT: "1080"
+      BROWSER_VIEWPORT_WIDTH: "1920"
+      BROWSER_VIEWPORT_HEIGHT: "1080"
+      CAMOFOX_PORT: "9377"
+      # Explicit handoff leases protect work; manual-only tabs have a generous
+      # default while idle cleanup remains bounded for unattended contexts.
+      TAB_INACTIVITY_MS: "1800000"
+      SESSION_TIMEOUT_MS: "3600000"
+      SELKIES_ENABLE_SHARING: "false|locked"
+      SELKIES_UI_SIDEBAR_SHOW_SHARING: "false"
+      SELKIES_COMMAND_ENABLED: "false|locked"
+      SELKIES_FILE_TRANSFERS: none
+      SELKIES_UI_SIDEBAR_SHOW_FILES: "false"
+      SELKIES_UI_SIDEBAR_SHOW_APPS: "false"
+      SELKIES_MICROPHONE_ENABLED: "false|locked"
+      SELKIES_GAMEPAD_ENABLED: "false|locked"
+      SELKIES_UI_SIDEBAR_SHOW_GAMEPADS: "false"
+      CAMOFOX_CRASH_REPORT_ENABLED: "false"
+    ports:
+      - "127.0.0.1:19394:9377"
+      - "127.0.0.1:19396:3000"
+    volumes:
+      - candidate_config:/config
+      - ./secrets/control-key:/run/secrets/camofox-control-key:ro
+    networks: [candidate_browser]
+    healthcheck:
+      test: [CMD-SHELL, 'test -S /tmp/.X11-unix/X1 && pgrep -x openbox >/dev/null && curl -fsS --max-time 2 http://127.0.0.1:9377/health >/dev/null']
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 3
+  edge:
+    profiles: [public]
+    image: nginx:alpine
+    pull_policy: never
+    container_name: camofox-native-r3-candidate-edge
+    restart: unless-stopped
+    volumes:
+      - ./selkies-edge.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [candidate_browser]
+    depends_on:
+      browser: {condition: service_healthy}
+volumes:
+  candidate_config:
+    name: camofox-native-r3-candidate-fresh-config
+networks:
+  candidate_browser:
+    name: camofox-native-r3-candidate-private

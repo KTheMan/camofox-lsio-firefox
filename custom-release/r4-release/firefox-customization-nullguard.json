@@ -1,0 +1,17 @@
+{
+  "originalArchiveSha256": "269da6dadc2dd93b5b0baafecccc8de1849020d04889d4fdaaa5423bf7e8545e",
+  "patchedArchiveSha256": "8cca3416c9058732f2f07b4e77fd3e471865fa2d7816271ea85501c43c9adbb2",
+  "originalSourceSha256": "136d597c3101ec9625747445db740e7633f2c461ec2d2c715b38327df9e2517d",
+  "patchedSourceSha256": "4461f4809957f5911123edef766ecfaf9c5228b739ef95c328c0ca4d4ffaae3b",
+  "changedEntries": [
+    "moz-src/browser/components/customizableui/CustomizableUI.sys.mjs"
+  ],
+  "unchangedEntryCount": 2428,
+  "entryMetadataDifferences": [],
+  "pureTests": {
+    "testsPassed": 6,
+    "originalNullFailureReproduced": true,
+    "nullPreserved": true
+  },
+  "patch": "--- original/moz-src/browser/components/customizableui/CustomizableUI.sys.mjs\n+++ nullguard/moz-src/browser/components/customizableui/CustomizableUI.sys.mjs\n@@ -3799,6 +3799,9 @@\n    * @returns {any}\n    */\n   serializerHelper(_aKey, aValue) {\n+    if (aValue === null) {\n+      return null;\n+    }\n     if (typeof aValue == \"object\" && aValue.constructor.name == \"Map\") {\n       let result = {};\n       for (let [mapKey, mapValue] of aValue) {\n"
+}
